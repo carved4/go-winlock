@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"unicode/utf16"
 	wc "github.com/carved4/go-wincall"
+	"flag"
 )
 
 func main() {
