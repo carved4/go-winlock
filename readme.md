@@ -133,7 +133,7 @@ go build -o winunlock.exe
 
 ```bash
 # decrypt with key from encryption output
-.\decrypter.exe -path "C:\target\directory" -key f40773ae66dde5d1631e193a967182829f217e708e35ae6191dddc104da66a9c
+.\winunlock.exe -path "C:\target\directory" -key f40773ae66dde5d1631e193a967182829f217e708e35ae6191dddc104da66a9c
 
 # example output:
 # found 4 files to decrypt
