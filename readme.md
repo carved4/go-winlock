@@ -17,7 +17,7 @@ this tool is designed for authorized security testing only. running this on syst
 
 the project consists of two components:
 - `winlock/` - encrypter binary
-- `dec/` - decrypter binary
+- `winunlock/` - decrypter binary
 
 ### winapi usage
 
