@@ -154,35 +154,6 @@ the following extensions are encrypted:
 
 modify the `targetExtensions` map in `encrypt.go` / `decrypt.go` to adjust scope.
 
-## common issues
-
-### status_invalid_buffer_size (0xc0000206)
-indicates bcrypt buffer size exceeds 32-bit limit. this is handled automatically via chunked processing for files >256mb.
-
-### readfile returns 0 bytes
-typically caused by:
-- incorrect file sharing flags (fixed: uses `FILE_SHARE_READ|FILE_SHARE_WRITE`)
-- file size >4gb with 32-bit size retrieval (fixed: uses 64-bit size calculation)
-
-### bcryptsetproperty failed (0xc0000008)
-`STATUS_INVALID_HANDLE` from concurrent bcrypt operations. this implementation uses sequential processing to avoid race conditions.
-
-## defensive considerations
-
-**detection vectors**:
-- bcrypt api calls (aes-256-cbc pattern)
-- recursive file enumeration via findnextfilew
-- vssadmin execution with shadow deletion flags
-- token elevation queries
-- mass file modification events
-
-**prevention**:
-- restrict bcrypt.dll access for unprivileged processes
-- monitor vssadmin.exe executions
-- implement file system audit policies
-- restrict token query privileges
-- use application whitelisting
-
 ## dependencies
 
 - [go-wincall](https://github.com/carved4/go-wincall) - pure winapi bindings for go
